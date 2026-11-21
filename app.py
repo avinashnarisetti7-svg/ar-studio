@@ -604,32 +604,15 @@ CAPCUT_BUILDER_UI = """
                             status.innerText = "AR Published!";
             bar.style.width = "100%";
 
-            const successOverlay = document.createElement("div");
-            successOverlay.innerHTML = `
-                <style>
-                    @keyframes arPopIn { 0% { transform: scale(0.6); opacity: 0; } 70% { transform: scale(1.06); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
-                    @keyframes arGlow { 0%, 100% { box-shadow: 0 0 25px rgba(0, 242, 254, 0.45); } 50% { box-shadow: 0 0 45px rgba(79, 172, 254, 0.85); } }
-                    @keyframes checkDraw { to { stroke-dashoffset: 0; } }
-                    .ar-done-backdrop { position: fixed; inset: 0; background: rgba(9, 9, 11, 0.92); backdrop-filter: blur(10px); z-index: 99999; display: flex; align-items: center; justify-content: center; font-family: -apple-system, sans-serif; }
-                    .ar-done-card { background: #141417; border: 1px solid rgba(0, 242, 254, 0.35); border-radius: 24px; padding: 34px 28px; text-align: center; max-width: 310px; width: 88%; animation: arPopIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards, arGlow 2s infinite; }
-                    .ar-logo-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 18px; letter-spacing: 0.4px; }
-                    .ar-logo-pro { background: linear-gradient(135deg, #00f2fe, #4facfe); color: #000; font-size: 11px; font-weight: 900; padding: 3px 8px; border-radius: 8px; }
-                    .ar-check-circle { width: 68px; height: 68px; border-radius: 50%; background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(79,172,254,0.18)); border: 2px solid #00f2fe; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
-                    .ar-check-path { stroke: #00f2fe; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke-dasharray: 48; stroke-dashoffset: 48; animation: checkDraw 0.55s 0.25s ease forwards; }
-                </style>
-                <div class="ar-done-backdrop">
-                    <div class="ar-done-card">
-                        <div class="ar-logo-badge">AR Cut <span class="ar-logo-pro">PRO</span></div>
-                        <div class="ar-check-circle">
-                            <svg width="34" height="34" viewBox="0 0 36 36"><path class="ar-check-path" d="M9 18.5 L15.5 25 L27 11.5"/></svg>
-                        </div>
-                        <div style="color:#fff; font-size:18px; font-weight:700; margin-bottom:6px;">AR Published!</div>
-                        <div style="color:#a1a1aa; font-size:13px;">Synced to Cloud & Ready to Scan</div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(successOverlay);
-            setTimeout(() => location.reload(), 2200);
+        const st = document.createElement("style");
+        st.textContent = "@keyframes arPopIn{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.06);opacity:1}100%{transform:scale(1)}}.ar-done-backdrop{position:fixed;inset:0;background:rgba(9,9,11,.92);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:99999}.ar-done-card{background:#141417;border:1px solid rgba(0,242,254,.35);border-radius:24px;padding:32px 28px;text-align:center;animation:arPopIn .45s ease forwards}.ar-logo-badge{display:inline-flex;align-items:center;gap:6px;font-size:20px;font-weight:800;color:#fff;margin-bottom:14px}.ar-logo-pro{background:linear-gradient(135deg,#00f2fe,#4facfe);color:#000;font-size:11px;padding:2px 7px;border-radius:6px}";
+        document.head.appendChild(st);
+        const successOverlay = document.createElement("div");
+        successOverlay.className = "ar-done-backdrop";
+        successOverlay.innerHTML = '<div class="ar-done-card"><div class="ar-logo-badge">AR Cut <span class="ar-logo-pro">PRO</span></div><div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:6px">AR Published!</div><div style="color:#a1a1aa;font-size:13px">Synced to Cloud & Ready to Scan</div></div>';
+        document.body.appendChild(successOverlay);
+        setTimeout(() => location.reload(), 2200);
+
 
 
             } catch (err) {
