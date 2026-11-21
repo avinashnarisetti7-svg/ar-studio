@@ -792,8 +792,7 @@ def home():
             firebase_api_key=FIREBASE_API_KEY,
             firebase_auth_domain=FIREBASE_AUTH_DOMAIN
         )
-  
-        conn = get_db()
+    conn = get_db()
     try:
         conn.execute("ALTER TABLE users ADD COLUMN is_co_owner INTEGER DEFAULT 0")
         conn.commit()
@@ -804,9 +803,9 @@ def home():
         session.clear()
         conn.close()
         return redirect(url_for("home"))
-
     items = conn.execute("SELECT * FROM ar_items WHERE owner_email = ? ORDER BY id DESC", (email,)).fetchall()
     conn.close()
+    
 
     used_gb = round(user["used_bytes"] / ONE_GB_BYTES, 2)
     quota_gb = round(user["quota_bytes"] / ONE_GB_BYTES, 2)
