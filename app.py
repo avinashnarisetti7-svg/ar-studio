@@ -949,10 +949,17 @@ def ar_scan(slug):
     studio = conn.execute("SELECT * FROM users WHERE studio_slug = ?", (slug,)).fetchone()
     if not studio:
         conn.close()
-        ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
+        return "Studio not found!", 404
+    all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? ORDER BY id DESC", (slug,)).fetchall()
+    item_id = request.args.get("id", type=int)
+    active_item = next((it for it in all_items if it["id"] == item_id), all_items[0]) if all_items else None
+    conn.close()
+    return render_template_string(REAL_AR_SCANNER_UI, studio=studio, all_items=all_items, active_item=active_item)
 
+ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
+    
     email = session.get("user_email", "")
     conn = get_db()
     for col in ["max_generates INTEGER DEFAULT 5", "is_co_owner INTEGER DEFAULT 0"]:
@@ -1018,30 +1025,3 @@ def admin_panel():
         {rows}
     </body></html>"""
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h2 style="margin:0;">AR Cut PRO <span style="background:#00f2fe;color:#000;font-size:11px;padding:3px 8px;border-radius:6px;">ADMIN</span></h2>
-            <a href="/" style="color:#00f2fe;font-size:13px;text-decoration:none;">← Dashboard</a>
-        </div>
-        <div style="margin-bottom:14px;font-size:13px;color:#a1a1aa;">Total Registered Users: <b style="color:#fff;">{len(users)}</b></div>
-        {rows}
-    </body></html>"""
-
-@app.route("/manifest.json")
-def pwa_manifest():
-    return jsonify({
-        "name": "AR Cut PRO - Creator Cloud Studio",
-        "short_name": "AR Cut PRO",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#09090b",
-        "theme_color": "#00f2fe",
-        "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/3159/3159310.png", "sizes": "512x512", "type": "image/png"}]
-    })
-
-@app.route("/sw.js")
-def pwa_sw():
-    return "self.addEventListener('fetch', function(e) {});", 200, {"Content-Type": "application/javascript"}
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
