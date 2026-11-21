@@ -797,7 +797,7 @@ def home():
         conn.execute("ALTER TABLE users ADD COLUMN is_co_owner INTEGER DEFAULT 0")
         conn.commit()
     except Exception:
-        pass
+        conn.rollback()
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user:
         session.clear()
