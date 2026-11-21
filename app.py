@@ -102,6 +102,7 @@ LOGIN_UI = """
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>AR Cut PRO - Gmail Cloud Sign In</title>
+    <meta name="google-site-verification" content="XnW5dppkPxWCpaxUsavU6_p07SI9CfBTH5pdufq8-PM" />
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
