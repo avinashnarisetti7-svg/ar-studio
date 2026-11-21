@@ -289,19 +289,23 @@ CAPCUT_BUILDER_UI = """
         .tab-section { display: none; }
         .tab-section.active { display: block; }
         .qr-card { background: #fff; color: #000; padding: 18px; border-radius: 16px; text-align: center; }
-      <div class="topbar">
-    <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      {% if is_admin %}
+    </style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    {% if is_admin %}
       <a href="/admin" class="export-btn" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;">Owner Panel</a>
-      {% endif %}
-      <a href="/studio/{{ user.studio_slug }}" target="_blank" class="export-btn">Live Site</a>
-    </div>
+    {% endif %}
+    <a href="/studio/{{ user.studio_slug }}" target="_blank" class="export-btn">Live Site</a>
   </div>
+</div>
 
-       \u003Cspan style=\"color:#00f2fe; font-size:11px; font-weight:600;\">5 GB Free Cloud Plan Active\u003C/span> <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
-        <a href="/studio/{{ user.studio_slug }}" target="_blank" class="export-btn">Live Site</a>
-    </div>
+
+
+<div class="container">
+
 
     <div class="container">
         <div class="storage-bar-card">
