@@ -431,8 +431,8 @@ CAPCUT_BUILDER_UI = """
             });
         }
 
-        async function uploadFileInChunks(file, prefix, onProgress) {
-            const chunkSize = 2 * 1024 * 1024;
+                async function uploadFileInChunks(file, prefix, onProgress) {
+            const chunkSize = 1024 * 1024;
             const totalChunks = Math.ceil(file.size / chunkSize);
             const safeName = prefix + "_" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, '');
 
@@ -441,14 +441,23 @@ CAPCUT_BUILDER_UI = """
                 const end = Math.min(file.size, start + chunkSize);
                 const chunk = file.slice(start, end);
 
-                const formData = new FormData();
-                formData.append("chunk", chunk);
-                formData.append("filename", safeName);
-                formData.append("chunkIndex", i);
-                formData.append("totalChunks", totalChunks);
+                let uploaded = false;
+                for (let attempt = 1; attempt <= 3 && !uploaded; attempt++) {
+                    try {
+                        const formData = new FormData();
+                        formData.append("chunk", chunk);
+                        formData.append("filename", safeName);
+                        formData.append("chunkIndex", i);
+                        formData.append("totalChunks", totalChunks);
 
-                const res = await fetch("/upload_chunk", { method: "POST", body: formData });
-                if (!res.ok) throw new Error("Chunk upload failed");
+                        const res = await fetch("/upload_chunk", { method: "POST", body: formData });
+                        if (!res.ok) throw new Error("Server error " + res.status);
+                        uploaded = true;
+                    } catch (e) {
+                        if (attempt === 3) throw new Error("Upload network error: " + e.message);
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
+                }
                 onProgress(Math.round(((i + 1) / totalChunks) * 100));
             }
             return "/static/uploads/" + safeName;
@@ -456,12 +465,18 @@ CAPCUT_BUILDER_UI = """
 
         function loadImage(file) {
             return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error("Image load failed"));
-                img.src = URL.createObjectURL(file);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = () => reject(new Error("Photo format not supported (use JPG/PNG)"));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error("Please re-select the Photo and try again"));
+                reader.readAsDataURL(file);
             });
         }
+
     </script>
 
         <script>
