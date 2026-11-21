@@ -944,12 +944,12 @@ def admin_panel():
     
     email = session.get("user_email", "")
     conn = get_db()
-    for col in ["max_generates INTEGER DEFAULT 5", "is_co_owner INTEGER DEFAULT 0"]:
-        try:
-            conn.execute(f"ALTER TABLE users ADD COLUMN {col}")
-            conn.commit()
-        except Exception:
-            pass
+    conn = get_db()
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_generates INTEGER DEFAULT 5")
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_co_owner INTEGER DEFAULT 0")
+    conn.commit()
+    me = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
     me = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     is_co = bool(me["is_co_owner"]) if me and "is_co_owner" in me.keys() else False
     if email.lower() != ADMIN_EMAIL.lower() and not is_co:
