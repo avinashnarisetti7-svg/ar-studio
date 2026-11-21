@@ -216,6 +216,9 @@ CAPCUT_BUILDER_UI = """
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>AR Cut Studio - {{ user.studio_name }}</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#00f2fe">
+    <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
     <style>
         :root {
             --bg: #09090b; --surface: #141417; --surface-2: #1f1f24;
@@ -286,11 +289,17 @@ CAPCUT_BUILDER_UI = """
         .tab-section { display: none; }
         .tab-section.active { display: block; }
         .qr-card { background: #fff; color: #000; padding: 18px; border-radius: 16px; text-align: center; }
-    </style>
-</head>
-<body>
-    <div class="topbar">
-        <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
+      <div class="topbar">
+    <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      {% if is_admin %}
+      <a href="/admin" class="export-btn" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;">Owner Panel</a>
+      {% endif %}
+      <a href="/studio/{{ user.studio_slug }}" target="_blank" class="export-btn">Live Site</a>
+    </div>
+  </div>
+
+       \u003Cspan style=\"color:#00f2fe; font-size:11px; font-weight:600;\">5 GB Free Cloud Plan Active\u003C/span> <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
         <a href="/studio/{{ user.studio_slug }}" target="_blank" class="export-btn">Live Site</a>
     </div>
 
@@ -784,7 +793,12 @@ def home():
             firebase_auth_domain=FIREBASE_AUTH_DOMAIN
         )
 
-    conn = get_db()
+        conn = get_db()
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN is_co_owner INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user:
         session.clear()
@@ -800,6 +814,7 @@ def home():
 
     scan_url = request.host_url.rstrip("/") + url_for("ar_scan", slug=user["studio_slug"])
     qr_b64 = generate_qr_base64(scan_url)
+    is_admin = (email.lower() == ADMIN_EMAIL.lower()) or (bool(user["is_co_owner"]) if "is_co_owner" in user.keys() else False)
 
     return render_template_string(
         CAPCUT_BUILDER_UI,
@@ -810,8 +825,10 @@ def home():
         pct_used=pct_used,
         qr_b64=qr_b64,
         cloud_name=CLOUD_NAME,
-        upload_preset=UPLOAD_PRESET
+        upload_preset=UPLOAD_PRESET,
+        is_admin=is_admin
     )
+
 
 @app.route("/auth_gmail", methods=["POST"])
 def auth_gmail():
@@ -932,34 +949,36 @@ def ar_scan(slug):
     studio = conn.execute("SELECT * FROM users WHERE studio_slug = ?", (slug,)).fetchone()
     if not studio:
         conn.close()
-        return "Studio not found!", 404
-    all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? ORDER BY id DESC", (slug,)).fetchall()
-    item_id = request.args.get("id", type=int)
-    active_item = next((it for it in all_items if it["id"] == item_id), all_items[0]) if all_items else None
-    conn.close()
-    return render_template_string(REAL_AR_SCANNER_UI, studio=studio, all_items=all_items, active_item=active_item)
-
-ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
+        ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
 
 @app.route("/admin", methods=["GET", "POST"])
 def admin_panel():
     email = session.get("user_email", "")
-    if email.lower() != ADMIN_EMAIL.lower():
-        return "Access Denied: Owner Only", 403
     conn = get_db()
-    try:
-        conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
-        conn.commit()
-    except Exception:
-        pass
+    for col in ["max_generates INTEGER DEFAULT 5", "is_co_owner INTEGER DEFAULT 0"]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col}")
+            conn.commit()
+        except Exception:
+            pass
+    me = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    is_co = bool(me["is_co_owner"]) if me and "is_co_owner" in me.keys() else False
+    if email.lower() != ADMIN_EMAIL.lower() and not is_co:
+        conn.close()
+        return "Access Denied: Owner Only", 403
+
     if request.method == "POST":
         target_email = request.form.get("target_email")
         new_gb = float(request.form.get("quota_gb", 5))
         new_gens = int(request.form.get("max_generates", 5))
-        conn.execute("UPDATE users SET quota_bytes = ?, max_generates = ? WHERE email = ?", (int(new_gb * 1024 * 1024 * 1024), new_gens, target_email))
+        new_co = 1 if request.form.get("is_co_owner") == "1" else 0
+        if target_email.lower() == ADMIN_EMAIL.lower():
+            new_co = 1
+        conn.execute("UPDATE users SET quota_bytes = ?, max_generates = ?, is_co_owner = ? WHERE email = ?", (int(new_gb * 1024 * 1024 * 1024), new_gens, new_co, target_email))
         conn.commit()
         conn.close()
         return redirect(url_for("admin_panel"))
+
     users = conn.execute("""
         SELECT u.*, COUNT(a.id) AS gen_count
         FROM users u LEFT JOIN ar_items a ON u.email = a.owner_email
@@ -971,20 +990,34 @@ def admin_panel():
         used_mb = round((u["used_bytes"] or 0) / (1024 * 1024), 1)
         quota_gb = round((u["quota_bytes"] or 5368709120) / (1024 * 1024 * 1024), 1)
         max_g = u["max_generates"] if "max_generates" in u.keys() and u["max_generates"] is not None else 5
+        co_val = 1 if (u["email"].lower() == ADMIN_EMAIL.lower() or ("is_co_owner" in u.keys() and u["is_co_owner"])) else 0
+        badge = '<span style="background:#f59e0b;color:#000;font-size:10px;padding:2px 6px;border-radius:5px;margin-left:6px;">OWNER</span>' if u["email"].lower() == ADMIN_EMAIL.lower() else ('<span style="background:#00f2fe;color:#000;font-size:10px;padding:2px 6px;border-radius:5px;margin-left:6px;">CO-OWNER</span>' if co_val else '')
         rows += f"""
         <div style="background:#141417;border:1px solid #2a2a32;border-radius:16px;padding:16px;margin-bottom:14px;">
-            <div style="font-weight:700;font-size:15px;color:#00f2fe;">{u['studio_name'] or 'No Studio Name'}</div>
+            <div style="font-weight:700;font-size:15px;color:#00f2fe;">{u['studio_name'] or 'No Studio Name'}{badge}</div>
             <div style="font-size:12px;color:#a1a1aa;margin:3px 0;">{u['display_name'] or ''} ({u['email']})</div>
             <div style="font-size:12px;color:#fff;margin:6px 0;">WhatsApp: {u['whatsapp'] or 'N/A'} | Used: <b>{used_mb} MB / {quota_gb} GB</b> | Generates: <b>{u['gen_count']} / {max_g}</b></div>
             <form method="POST" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
                 <input type="hidden" name="target_email" value="{u['email']}">
-                <label style="font-size:12px;">GB: <input type="number" step="0.5" name="quota_gb" value="{quota_gb}" style="width:65px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
-                <label style="font-size:12px;">Gens: <input type="number" name="max_generates" value="{max_g}" style="width:65px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
+                <label style="font-size:12px;">GB: <input type="number" step="0.5" name="quota_gb" value="{quota_gb}" style="width:60px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
+                <label style="font-size:12px;">Gens: <input type="number" name="max_generates" value="{max_g}" style="width:60px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
+                <label style="font-size:12px;">Role: <select name="is_co_owner" style="padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;">
+                    <option value="0" {'selected' if co_val == 0 else ''}>User</option>
+                    <option value="1" {'selected' if co_val == 1 else ''}>Co-Owner</option>
+                </select></label>
                 <button type="submit" style="background:linear-gradient(135deg,#00f2fe,#4facfe);color:#000;border:none;padding:7px 14px;border-radius:8px;font-weight:800;cursor:pointer;">Update</button>
             </form>
         </div>"""
     return f"""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>AR Cut PRO - Owner Admin</title></head>
     <body style="background:#09090b;color:#fff;font-family:-apple-system,sans-serif;padding:18px;max-width:600px;margin:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;">AR Cut PRO <span style="background:#00f2fe;color:#000;font-size:11px;padding:3px 8px;border-radius:6px;">ADMIN</span></h2>
+            <a href="/" style="color:#00f2fe;font-size:13px;text-decoration:none;">← Dashboard</a>
+        </div>
+        <div style="margin-bottom:14px;font-size:13px;color:#a1a1aa;">Total Registered Users: <b style="color:#fff;">{len(users)}</b></div>
+        {rows}
+    </body></html>"""
+
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <h2 style="margin:0;">AR Cut PRO <span style="background:#00f2fe;color:#000;font-size:11px;padding:3px 8px;border-radius:6px;">ADMIN</span></h2>
             <a href="/" style="color:#00f2fe;font-size:13px;text-decoration:none;">← Dashboard</a>
