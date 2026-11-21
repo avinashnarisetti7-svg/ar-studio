@@ -6,12 +6,37 @@ import base64
 import qrcode
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, request, render_template_string, redirect, url_for, jsonify, session
+from flask import Flask, request, render_template_string, redirect, url_for, jsonify, session, Response
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "arcut-pro-secret-2026")
+@app.route("/icon-<int:size>.png")
+def pwa_icon(size):
+    img = qrcode.make("AR Cut PRO").resize((size, size))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), mimetype="image/png")
 
+@app.route("/manifest.json")
+def pwa_manifest():
+    return jsonify({
+        "name": "AR Cut PRO Studio",
+        "short_name": "AR Cut PRO",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#09090b",
+        "theme_color": "#00f2fe",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+        ]
+    })
+
+@app.route("/sw.js")
+def pwa_sw():
+    return Response("self.addEventListener('fetch', e => {});", mimetype="application/javascript")
+    
 FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
 FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", "")
 CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
