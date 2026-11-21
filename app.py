@@ -464,8 +464,7 @@ CAPCUT_BUILDER_UI = """
         }
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
-    <script>
+        <script>
         async function startFastARUpload() {
             const title = document.getElementById("arTitle").value.trim();
             const photoFile = document.getElementById("arPhoto").files[0];
@@ -488,13 +487,14 @@ CAPCUT_BUILDER_UI = """
 
             btn.disabled = true;
             wrap.style.display = "block";
-            status.innerText = "1/3 Compiling AR Photo Target...";
+            status.innerText = "1/3 Loading AR Engine & Compiling Photo...";
             bar.style.width = "10%";
 
             try {
                 const img = await loadImage(photoFile);
-                const CompilerClass = (window.MINDAR && window.MINDAR.IMAGE) ? window.MINDAR.IMAGE.Compiler : null;
-                if (!CompilerClass) throw new Error("AR Engine loading... refresh page once and try again.");
+                const mindarMod = await import("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js");
+                const CompilerClass = mindarMod.Compiler || (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler);
+                if (!CompilerClass) throw new Error("AR Compiler could not initialize.");
 
                 const compiler = new CompilerClass();
                 await compiler.compileImageTargets([img], (progress) => {
@@ -548,6 +548,7 @@ CAPCUT_BUILDER_UI = """
             }
         }
     </script>
+
 </body>
 </html>
 """
