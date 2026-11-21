@@ -4,6 +4,8 @@ import sqlite3
 import io
 import base64
 import qrcode
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, request, render_template_string, redirect, url_for, jsonify, session
 from werkzeug.utils import secure_filename
 
@@ -14,6 +16,7 @@ FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
 FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", "")
 CLOUD_NAME = os.environ.get("CLOUDINARY_CLOUD_NAME", "")
 UPLOAD_PRESET = os.environ.get("CLOUDINARY_UPLOAD_PRESET", "")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 UPLOAD_FOLDER = os.path.join("static", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -23,10 +26,33 @@ DB_NAME = "arcut_cloud_v7.db"
 FREE_QUOTA_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB Free per Gmail
 ONE_GB_BYTES = 1 * 1024 * 1024 * 1024
 
-def init_db():
+class PgConnWrapper:
+    def __init__(self, pg_conn):
+        self.pg_conn = pg_conn
+
+    def execute(self, query, params=()):
+        q = query.replace("?", "%s").replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+        cur = self.pg_conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(q, params)
+        return cur
+
+    def commit(self):
+        self.pg_conn.commit()
+
+    def close(self):
+        self.pg_conn.close()
+
+def get_db():
+    if DATABASE_URL:
+        url = DATABASE_URL.replace("postgres://", "postgresql://", 1) if DATABASE_URL.startswith("postgres://") else DATABASE_URL
+        return PgConnWrapper(psycopg2.connect(url))
     conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db()
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
             display_name TEXT,
@@ -35,11 +61,11 @@ def init_db():
             tagline TEXT,
             whatsapp TEXT,
             theme TEXT DEFAULT 'dark',
-            quota_bytes INTEGER DEFAULT 5368709120,
-            used_bytes INTEGER DEFAULT 0
+            quota_bytes BIGINT DEFAULT 5368709120,
+            used_bytes BIGINT DEFAULT 0
         )
     """)
-    c.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS ar_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             owner_email TEXT,
@@ -48,7 +74,7 @@ def init_db():
             photo_url TEXT,
             video_url TEXT,
             mind_url TEXT,
-            size_bytes INTEGER DEFAULT 0,
+            size_bytes BIGINT DEFAULT 0,
             FOREIGN KEY(owner_email) REFERENCES users(email)
         )
     """)
@@ -57,10 +83,6 @@ def init_db():
 
 init_db()
 
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def make_slug(text):
     return re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-') or "studio"
