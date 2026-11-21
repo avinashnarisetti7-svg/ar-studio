@@ -667,7 +667,8 @@ REAL_AR_SCANNER_UI = """
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
-            <a-video src="#arVid" position="0 0 0" height="0.75" width="1" rotation="0 0 0"></a-video>
+            <a-video id="arPlane" src="#arVid" position="0 0 0" height="1" width="1" rotation="0 0 0"></a-video>
+
         </a-entity>
     </a-scene>
 
@@ -683,12 +684,25 @@ REAL_AR_SCANNER_UI = """
         <a class="btn" href="/studio/{{ studio.studio_slug }}">Exit</a>
     </div>
 
-    <script>
+        <script>
         const target = document.getElementById('targetEntity');
         const vid = document.getElementById('arVid');
+        const arPlane = document.getElementById('arPlane');
         const hint = document.getElementById('scanHint');
 
+        function syncVideoRatio() {
+            if (vid.videoWidth && vid.videoHeight) {
+                const ratio = vid.videoHeight / vid.videoWidth;
+                arPlane.setAttribute('width', '1');
+                arPlane.setAttribute('height', ratio.toFixed(4));
+            }
+        }
+
+        vid.addEventListener('loadedmetadata', syncVideoRatio);
+        if (vid.readyState >= 1) syncVideoRatio();
+
         target.addEventListener("targetFound", () => {
+            syncVideoRatio();
             hint.innerText = "Photo Detected! Playing AR Video...";
             vid.play();
         });
@@ -698,6 +712,7 @@ REAL_AR_SCANNER_UI = """
             vid.pause();
         });
     </script>
+
     {% else %}
     <div style="padding:100px 20px; text-align:center; background:#09090b; color:#fff; height:100vh;">
         <h3>No AR Photos Uploaded Yet!</h3>
