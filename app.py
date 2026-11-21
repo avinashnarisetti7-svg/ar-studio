@@ -65,12 +65,12 @@ def generate_qr_base64(url):
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-BUILDER_UI = """
+CAPCUT_BUILDER_UI = """
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AR Studio Builder v4 - Real WebAR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>AR Cut Studio — Creator Editor</title>
     <script type="importmap">
     {
       "imports": {
@@ -79,82 +79,312 @@ BUILDER_UI = """
     }
     </script>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 15px; background: #0f172a; color: #f8fafc; }
-        .card { background: #1e293b; padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #334155; }
-        input, select { width: 100%; padding: 10px; margin: 6px 0 14px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #fff; box-sizing: border-box; }
-        button { width: 100%; padding: 13px; background: #f59e0b; color: #000; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
-        button:disabled { background: #64748b; cursor: not-allowed; }
-        .btn-green { background: #10b981; color: #fff; text-decoration: none; display: block; text-align: center; padding: 13px; border-radius: 8px; font-weight: bold; margin-top: 10px; }
-        .qr-box { text-align: center; background: #fff; color: #000; padding: 15px; border-radius: 12px; margin-top: 12px; }
-        .studio-pill { display: inline-block; background: #334155; color: #38bdf8; padding: 6px 12px; border-radius: 20px; text-decoration: none; margin: 4px; font-size: 13px; }
-        .progress-wrap { display: none; margin-top: 12px; background: #0f172a; border-radius: 8px; padding: 10px; border: 1px solid #38bdf8; }
-        .bar-bg { width: 100%; height: 12px; background: #334155; border-radius: 6px; overflow: hidden; margin-top: 6px; }
-        .bar-fill { width: 0%; height: 100%; background: #10b981; transition: width 0.2s; }
+        :root {
+            --bg: #09090b;
+            --surface: #141417;
+            --surface-2: #1f1f24;
+            --border: #2a2a32;
+            --cyan: #00f2fe;
+            --accent: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            --text: #f4f4f5;
+            --muted: #a1a1aa;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 0 0 85px 0;
+            background: var(--bg); color: var(--text);
+        }
+        /* Top CapCut Header */
+        .topbar {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(9, 9, 11, 0.9); backdrop-filter: blur(12px);
+            padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .brand { font-weight: 800; font-size: 17px; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; }
+        .brand-badge { background: var(--accent); color: #000; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 6px; }
+        .export-btn {
+            background: var(--accent); color: #000; text-decoration: none;
+            font-weight: 700; font-size: 13px; padding: 8px 14px; border-radius: 20px;
+        }
+
+        .container { padding: 16px; max-width: 520px; margin: auto; }
+
+        /* CapCut Hero "+ New Project" Banner */
+        .new-project-hero {
+            background: linear-gradient(135deg, #16222a 0%, #1a1a2e 100%);
+            border: 1px solid #2d3748; border-radius: 18px;
+            padding: 24px 16px; text-align: center; margin-bottom: 18px;
+            box-shadow: 0 10px 30px rgba(0, 242, 254, 0.08);
+        }
+        .plus-circle {
+            width: 52px; height: 52px; border-radius: 16px; background: var(--accent);
+            color: #000; font-size: 28px; font-weight: 700; line-height: 52px;
+            margin: 0 auto 10px; box-shadow: 0 4px 15px rgba(0, 242, 254, 0.4);
+        }
+        .new-project-hero h3 { margin: 0 0 4px; font-size: 17px; }
+        .new-project-hero p { margin: 0; font-size: 12px; color: var(--muted); }
+
+        /* Editor Card & Timeline Tracks */
+        .panel {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 16px; margin-bottom: 16px;
+        }
+        .panel-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+
+        /* Canvas Preview Box */
+        .canvas-box {
+            background: #000; border: 1px solid var(--border); border-radius: 14px;
+            height: 190px; display: flex; align-items: center; justify-content: center;
+            overflow: hidden; position: relative; margin-bottom: 14px; gap: 8px; padding: 8px;
+        }
+        .canvas-box img, .canvas-box video { height: 100%; width: 48%; object-fit: cover; border-radius: 10px; border: 1px solid #333; }
+        .canvas-placeholder { color: var(--muted); font-size: 12px; text-align: center; }
+
+        /* Timeline Track Buttons */
+        .track-row {
+            background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 12px; padding: 11px 12px; margin-bottom: 10px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .track-info { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; }
+        .track-tag { font-size: 10px; padding: 3px 7px; border-radius: 6px; font-weight: 800; }
+        .tag-img { background: rgba(0, 242, 254, 0.15); color: #00f2fe; }
+        .tag-vid { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
+        .file-trigger {
+            background: #27272f; color: #fff; padding: 6px 12px; border-radius: 8px;
+            font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #3f3f46;
+        }
+
+        input[type="text"], select {
+            width: 100%; padding: 11px 12px; margin: 6px 0 12px;
+            border-radius: 10px; border: 1px solid var(--border);
+            background: var(--surface-2); color: #fff; font-size: 14px;
+        }
+        .primary-btn {
+            width: 100%; padding: 14px; border: none; border-radius: 12px;
+            background: var(--accent); color: #000; font-weight: 800;
+            font-size: 15px; cursor: pointer; margin-top: 6px;
+        }
+        .primary-btn:disabled { background: #3f3f46; color: #a1a1aa; }
+
+        /* Progress Bar */
+        .progress-wrap { display: none; margin-top: 12px; background: var(--surface-2); border-radius: 10px; padding: 12px; border: 1px solid #00f2fe44; }
+        .bar-bg { width: 100%; height: 8px; background: #27272a; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+        .bar-fill { width: 0%; height: 100%; background: var(--accent); transition: width 0.2s; }
+
+        /* Project Grid (CapCut Drafts Style) */
+        .project-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .project-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 14px; overflow: hidden; position: relative;
+        }
+        .project-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
+        .project-meta { padding: 10px; }
+        .project-meta h4 { margin: 0 0 6px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .project-actions { display: flex; gap: 6px; }
+        .mini-btn {
+            flex: 1; text-align: center; padding: 6px; border-radius: 8px;
+            font-size: 11px; font-weight: 700; text-decoration: none; border: none; cursor: pointer;
+        }
+        .btn-scan { background: #00f2fe22; color: #00f2fe; }
+        .btn-del { background: #ef444422; color: #f87171; }
+
+        /* Bottom CapCut Tab Bar */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; z-index: 60;
+            background: rgba(14, 14, 18, 0.95); backdrop-filter: blur(14px);
+            border-top: 1px solid var(--border); display: flex; justify-content: space-around;
+            padding: 10px 0 12px;
+        }
+        .nav-item {
+            background: none; border: none; color: var(--muted);
+            font-size: 11px; font-weight: 600; display: flex; flex-direction: column;
+            align-items: center; gap: 4px; cursor: pointer;
+        }
+        .nav-item.active { color: #00f2fe; }
+        .nav-icon { font-size: 19px; }
+        .tab-section { display: none; }
+        .tab-section.active { display: block; }
+
+        .qr-card { background: #fff; color: #000; padding: 18px; border-radius: 16px; text-align: center; }
+        .studio-chip { display: inline-block; background: var(--surface-2); color: #00f2fe; padding: 6px 12px; border-radius: 20px; font-size: 12px; text-decoration: none; margin: 3px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
-    <h2>📸 Real AR Studio Builder (v4.0)</h2>
 
-    <div class="card">
-        <strong>Active Studio:</strong><br>
-        {% for s in all_studios %}
-            <a class="studio-pill" href="/?slug={{ s.slug }}">{{ s.name }}</a>
-        {% endfor %}
-    </div>
-    
-    <div class="card">
-        <h3>1. Studio Profile</h3>
-        <form method="POST" action="/save_studio">
-            <label>Studio Name</label>
-            <input type="text" name="name" value="{{ studio.name }}" required>
-            <label>Tagline</label>
-            <input type="text" name="tagline" value="{{ studio.tagline }}" required>
-            <label>WhatsApp Number (with 91)</label>
-            <input type="text" name="whatsapp" value="{{ studio.whatsapp }}" required>
-            <label>Theme</label>
-            <select name="theme">
-                <option value="dark" {% if studio.theme == 'dark' %}selected{% endif %}>Dark Luxury (Gold & Black)</option>
-                <option value="light" {% if studio.theme == 'light' %}selected{% endif %}>Minimal Classic White</option>
-            </select>
-            <button type="submit">💾 Save Studio Profile</button>
-        </form>
+    <div class="topbar">
+        <div class="brand">✂️ AR Cut <span class="brand-badge">PRO</span></div>
+        <a href="/studio/{{ studio.slug }}" target="_blank" class="export-btn">Export / Live Site ↗</a>
     </div>
 
-    <div class="card">
-        <h3>2. Upload AR Photo + Large Video (Fast Upload)</h3>
-        <label>Album / Event Title</label>
-        <input type="text" id="arTitle" placeholder="Ex: Wedding Highlight" required>
-        
-        <label>Select Album Photo (Clear high-contrast photo)</label>
-        <input type="file" id="arPhoto" accept="image/*" required>
-        
-        <label>Select AR Video (MP4 - Any size supported)</label>
-        <input type="file" id="arVideo" accept="video/mp4,video/*" required>
-        
-        <button id="uploadBtn" onclick="startFastARUpload()">⚡ Compile AR & Fast Upload</button>
+    <div class="container">
 
-        <div class="progress-wrap" id="progressWrap">
-            <div id="statusText">Preparing...</div>
-            <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
+        <!-- TAB 1: CAPCUT STUDIO EDITOR -->
+        <div id="tab-edit" class="tab-section active">
+            <div class="new-project-hero" onclick="document.getElementById('arTitle').focus()">
+                <div class="plus-circle">+</div>
+                <h3>New AR Album Project</h3>
+                <p>Link printed wedding photo to interactive AR video</p>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span>Preview Canvas</span><span>16:9 / Auto</span></div>
+                <div class="canvas-box" id="canvasPreview">
+                    <div class="canvas-placeholder">Select Photo & Video tracks below to preview</div>
+                </div>
+
+                <input type="text" id="arTitle" placeholder="Project Name (Ex: Wedding Reception AR)">
+
+                <!-- Timeline Track 1: Target Photo -->
+                <div class="track-row">
+                    <div class="track-info">
+                        <span class="track-tag tag-img">PHOTO</span>
+                        <span id="photoLabel">Target Album Photo</span>
+                    </div>
+                    <label class="file-trigger">
+                        + Add Photo
+                        <input type="file" id="arPhoto" accept="image/*" hidden onchange="previewMedia()">
+                    </label>
+                </div>
+
+                <!-- Timeline Track 2: Overlay Video -->
+                <div class="track-row">
+                    <div class="track-info">
+                        <span class="track-tag tag-vid">VIDEO</span>
+                        <span id="videoLabel">AR Overlay MP4</span>
+                    </div>
+                    <label class="file-trigger">
+                        + Add Video
+                        <input type="file" id="arVideo" accept="video/mp4,video/*" hidden onchange="previewMedia()">
+                    </label>
+                </div>
+
+                <button id="uploadBtn" class="primary-btn" onclick="startFastARUpload()">⚡ Render & Publish AR</button>
+
+                <div class="progress-wrap" id="progressWrap">
+                    <div id="statusText" style="font-size:12px; font-weight:600; color:#00f2fe;">Initializing...</div>
+                    <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <h3>3. Album Print QR Code (Direct AR Scanner)</h3>
-        <div class="qr-box">
-            <img src="data:image/png;base64,{{ qr_b64 }}" width="180" height="180"><br>
-            <small><strong>Scan to launch AR Camera: {{ studio.name }}</strong></small><br><br>
-            <a href="data:image/png;base64,{{ qr_b64 }}" download="{{ studio.slug }}-ar-qr.png" style="background:#0f172a; color:#fff; padding:8px 14px; border-radius:6px; text-decoration:none; font-size:13px;">⬇️ Download QR PNG</a>
+        <!-- TAB 2: PROJECTS / DRAFTS -->
+        <div id="tab-projects" class="tab-section">
+            <div class="panel-title"><span>AR Projects ({{ items|length }})</span><span>{{ studio.name }}</span></div>
+            {% if not items %}
+                <div class="panel" style="text-align:center; color:var(--muted); padding:40px 15px;">
+                    No AR projects yet. Tap <b>Studio</b> tab to create one!
+                </div>
+            {% endif %}
+            <div class="project-grid">
+                {% for item in items %}
+                <div class="project-card">
+                    <img src="{{ item.photo_url }}">
+                    <div class="project-meta">
+                        <h4>{{ item.title }}</h4>
+                        <div class="project-actions">
+                            <a href="/ar_scan/{{ studio.slug }}?id={{ item.id }}" class="mini-btn btn-scan">📷 Test AR</a>
+                            <form method="POST" action="/delete_ar/{{ studio.slug }}/{{ item.id }}" style="flex:1; margin:0;">
+                                <button type="submit" class="mini-btn btn-del" style="width:100%;">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
+
+        <!-- TAB 3: BRAND SETTINGS & QR CODE -->
+        <div id="tab-brand" class="tab-section">
+            <div class="panel">
+                <div class="panel-title"><span>Switch Studio</span></div>
+                {% for s in all_studios %}
+                    <a class="studio-chip" href="/?slug={{ s.slug }}">{{ s.name }}</a>
+                {% endfor %}
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span>Studio Branding</span></div>
+                <form method="POST" action="/save_studio">
+                    <input type="text" name="name" value="{{ studio.name }}" placeholder="Studio Name" required>
+                    <input type="text" name="tagline" value="{{ studio.tagline }}" placeholder="Tagline" required>
+                    <input type="text" name="whatsapp" value="{{ studio.whatsapp }}" placeholder="WhatsApp (with 91)" required>
+                    <select name="theme">
+                        <option value="dark" {% if studio.theme == 'dark' %}selected{% endif %}>Dark Luxury (Gold & Black)</option>
+                        <option value="light" {% if studio.theme == 'light' %}selected{% endif %}>Minimal Classic White</option>
+                    </select>
+                    <button type="submit" class="primary-btn">💾 Save Studio Profile</button>
+                </form>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title"><span>Album Print QR Code</span></div>
+                <div class="qr-card">
+                    <img src="data:image/png;base64,{{ qr_b64 }}" width="170" height="170"><br>
+                    <strong style="font-size:13px;">{{ studio.name }} — AR Scanner</strong><br><br>
+                    <a href="data:image/png;base64,{{ qr_b64 }}" download="{{ studio.slug }}-ar-qr.png" style="background:#09090b; color:#fff; padding:9px 16px; border-radius:10px; text-decoration:none; font-size:12px; font-weight:700;">⬇️ Download Print QR</a>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <a href="/studio/{{ studio.slug }}" class="btn-green" target="_blank">🚀 Open Live Studio Website</a>
+    <!-- Bottom CapCut Navigation -->
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('edit', this)">
+            <span class="nav-icon">✂️</span>
+            <span>Studio</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('projects', this)">
+            <span class="nav-icon">🎬</span>
+            <span>Projects ({{ items|length }})</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('brand', this)">
+            <span class="nav-icon">⚙️</span>
+            <span>Brand & QR</span>
+        </button>
+    </div>
+
+    <script>
+        function switchTab(tabName, el) {
+            document.querySelectorAll('.tab-section').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('tab-' + tabName).classList.add('active');
+            el.classList.add('active');
+        }
+
+        function previewMedia() {
+            const pFile = document.getElementById('arPhoto').files[0];
+            const vFile = document.getElementById('arVideo').files[0];
+            const canvas = document.getElementById('canvasPreview');
+
+            if (pFile) document.getElementById('photoLabel').innerText = pFile.name.slice(0, 18);
+            if (vFile) document.getElementById('videoLabel').innerText = vFile.name.slice(0, 18);
+
+            if (pFile || vFile) {
+                canvas.innerHTML = '';
+                if (pFile) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(pFile);
+                    canvas.appendChild(img);
+                }
+                if (vFile) {
+                    const vid = document.createElement('video');
+                    vid.src = URL.createObjectURL(vFile);
+                    vid.muted = true; vid.autoplay = true; vid.loop = true; vid.playsInline = true;
+                    canvas.appendChild(vid);
+                }
+            }
+        }
+    </script>
 
     <script type="module">
         import { Compiler } from 'mindar-image-three';
 
         async function uploadFileInChunks(file, prefix, onProgress) {
-            const chunkSize = 2 * 1024 * 1024; // 2MB per chunk (fast & timeout-proof)
+            const chunkSize = 2 * 1024 * 1024;
             const totalChunks = Math.ceil(file.size / chunkSize);
             const safeName = prefix + "_" + Date.now() + "_" + file.name.replace(/[^a-zA-Z0-9._-]/g, '');
 
@@ -170,7 +400,7 @@ BUILDER_UI = """
                 formData.append("totalChunks", totalChunks);
 
                 const res = await fetch("/upload_chunk", { method: "POST", body: formData });
-                if (!res.ok) throw new Error("Chunk upload failed");
+                if (!res.ok) throw new Error("Upload failed");
                 onProgress(Math.round(((i + 1) / totalChunks) * 100));
             }
             return "/static/uploads/" + safeName;
@@ -191,7 +421,7 @@ BUILDER_UI = """
             const videoFile = document.getElementById("arVideo").files[0];
 
             if (!title || !photoFile || !videoFile) {
-                alert("Please enter title and select both Photo & Video!");
+                alert("Please enter Project Name and add both Photo & Video tracks!");
                 return;
             }
 
@@ -204,257 +434,8 @@ BUILDER_UI = """
             wrap.style.display = "block";
 
             try {
-                // Step 1: Compile AR Image Target (.mind) in Browser
-                status.innerText = "Step 1/3: Compiling AR Photo Target (10-15s)...";
+                status.innerText = "1/3 Compiling AR Photo Target...";
                 bar.style.width = "15%";
                 const img = await loadImage(photoFile);
                 const compiler = new Compiler();
-                await compiler.compileImageTargets([img], (progress) => {
-                    bar.style.width = (15 + Math.round(progress * 0.25)) + "%";
-                });
-                const exportedBuffer = await compiler.exportData();
-                const mindBlob = new Blob([exportedBuffer], { type: "application/octet-stream" });
-                const mindFile = new File([mindBlob], "target.mind");
-
-                // Step 2: Upload Photo & .mind file
-                status.innerText = "Step 2/3: Uploading Photo & AR Target...";
-                const photoUrl = await uploadFileInChunks(photoFile, "{{ studio.slug }}_img", () => {});
-                const mindUrl = await uploadFileInChunks(mindFile, "{{ studio.slug }}_mind", () => {});
-                bar.style.width = "50%";
-
-                // Step 3: Fast Chunked Upload for Large Video
-                status.innerText = "Step 3/3: Fast Uploading Video: 0%";
-                const videoUrl = await uploadFileInChunks(videoFile, "{{ studio.slug }}_vid", (pct) => {
-                    status.innerText = `Step 3/3: Fast Uploading Video: ${pct}%`;
-                    bar.style.width = (50 + Math.round(pct * 0.5)) + "%";
-                });
-
-                // Save record to database
-                await fetch("/save_ar_item/{{ studio.slug }}", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ title, photo_url: photoUrl, video_url: videoUrl, mind_url: mindUrl })
-                });
-
-                status.innerText = "✅ AR Album Ready! Reloading...";
-                setTimeout(() => location.reload(), 800);
-
-            } catch (err) {
-                alert("Error: " + err.message);
-                btn.disabled = false;
-            }
-        };
-    </script>
-</body>
-</html>
-"""
-
-PORTFOLIO_UI = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ studio.name }} - AR Portfolio</title>
-    <style>
-        body {
-            font-family: sans-serif; margin: 0; padding: 20px; text-align: center;
-            background: {{ '#09090b' if studio.theme == 'dark' else '#f8fafc' }};
-            color: {{ '#fafafa' if studio.theme == 'dark' else '#0f172a' }};
-        }
-        .hero { padding: 30px 10px; border-bottom: 1px solid #27272a; }
-        .badge { background: #f59e0b; color: #000; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: bold; }
-        .ar-card { background: {{ '#18181b' if studio.theme == 'dark' else '#ffffff' }}; padding: 15px; border-radius: 16px; margin: 20px auto; max-width: 420px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
-        img { width: 100%; border-radius: 10px; margin-top: 10px; }
-        .btn { display: inline-block; margin: 8px 4px; padding: 12px 22px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 14px; }
-        .wa-btn { background: #25D366; color: #fff; }
-        .cam-btn { background: #6366f1; color: #fff; }
-    </style>
-</head>
-<body>
-    <div class="hero">
-        <h1>{{ studio.name }}</h1>
-        <p>{{ studio.tagline }}</p>
-        <a class="btn wa-btn" href="https://wa.me/{{ studio.whatsapp }}?text=Hi {{ studio.name }}, I saw your AR Portfolio!" target="_blank">💬 Book on WhatsApp</a>
-        <a class="btn cam-btn" href="/ar_scan/{{ studio.slug }}">📷 Scan Printed Album (Live AR)</a>
-    </div>
-
-    <h3>✨ AR Enabled Album Photos</h3>
-    <p style="font-size:13px; opacity:0.8;">Open AR Scanner & point camera at any photo below to watch it come alive!</p>
-
-    {% for item in items %}
-    <div class="ar-card">
-        <span class="badge">✨ REAL AR TRACKING</span>
-        <h4>{{ item.title }}</h4>
-        <img src="{{ item.photo_url }}">
-        <br><br>
-        <a class="btn cam-btn" href="/ar_scan/{{ studio.slug }}?id={{ item.id }}">📷 Scan This Photo Now</a>
-    </div>
-    {% endfor %}
-</body>
-</html>
-"""
-
-REAL_AR_SCANNER_UI = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Live AR Scanner - {{ studio.name }}</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
-        .hud { position: fixed; top: 0; left: 0; width: 100%; z-index: 999; background: rgba(0,0,0,0.65); color: #fff; padding: 12px; text-align: center; }
-        .bottom-hud { position: fixed; bottom: 15px; left: 0; width: 100%; z-index: 999; text-align: center; }
-        .btn { background: #ef4444; color: #fff; padding: 10px 18px; border-radius: 20px; text-decoration: none; font-weight: bold; margin: 0 5px; border: none; font-size: 14px; }
-        select { padding: 10px; border-radius: 10px; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="hud">
-        <strong>📷 {{ studio.name }} — Live AR Camera</strong><br>
-        <small id="scanHint">Point camera directly at the album photo</small>
-    </div>
-
-    {% if active_item %}
-    <a-scene
-        mindar-image="imageTargetSrc: {{ active_item.mind_url }}; autoStart: true; uiScanning: yes;"
-        color-space="sRGB"
-        renderer="colorManagement: true, physicallyCorrectLights"
-        vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false">
-        
-        <a-assets>
-            <video id="arVid" src="{{ active_item.video_url }}" preload="auto" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
-        </a-assets>
-
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-        <a-entity id="targetEntity" mindar-image-target="targetIndex: 0">
-            <a-video src="#arVid" position="0 0 0" height="0.75" width="1" rotation="0 0 0"></a-video>
-        </a-entity>
-    </a-scene>
-
-    <div class="bottom-hud">
-        {% if all_items|length > 1 %}
-        <select onchange="location.href='/ar_scan/{{ studio.slug }}?id=' + this.value">
-            {% for it in all_items %}
-            <option value="{{ it.id }}" {% if it.id == active_item.id %}selected{% endif %}>{{ it.title }}</option>
-            {% endfor %}
-        </select>
-        {% endif %}
-        <button class="btn" style="background:#10b981;" onclick="document.getElementById('arVid').muted=false; document.getElementById('arVid').play();">🔊 Unmute Audio</button>
-        <a class="btn" href="/studio/{{ studio.slug }}">Exit</a>
-    </div>
-
-    <script>
-        const target = document.getElementById('targetEntity');
-        const vid = document.getElementById('arVid');
-        const hint = document.getElementById('scanHint');
-
-        target.addEventListener("targetFound", () => {
-            hint.innerText = "✨ Photo Detected! Playing AR Video...";
-            vid.play();
-        });
-
-        target.addEventListener("targetLost", () => {
-            hint.innerText = "Point camera directly at the album photo";
-            vid.pause();
-        });
-    </script>
-    {% else %}
-    <div style="padding:100px 20px; text-align:center; background:#000; color:#fff; height:100vh;">
-        <h3>No AR Photos Uploaded Yet!</h3>
-        <a class="btn" href="/studio/{{ studio.slug }}">Go Back</a>
-    </div>
-    {% endif %}
-</body>
-</html>
-"""
-
-@app.route("/")
-def home():
-    conn = get_db()
-    all_studios = conn.execute("SELECT * FROM studios").fetchall()
-    slug = request.args.get("slug") or all_studios[0]["slug"]
-    studio = conn.execute("SELECT * FROM studios WHERE slug = ?", (slug,)).fetchone()
-    if not studio:
-        studio = all_studios[0]
-    conn.close()
-
-    scan_url = request.host_url.rstrip("/") + url_for("ar_scan", slug=studio["slug"])
-    qr_b64 = generate_qr_base64(scan_url)
-    return render_template_string(BUILDER_UI, studio=studio, all_studios=all_studios, qr_b64=qr_b64)
-
-@app.route("/save_studio", methods=["POST"])
-def save_studio():
-    name = request.form["name"]
-    slug = make_slug(name)
-    conn = get_db()
-    conn.execute("""
-        INSERT INTO studios (slug, name, tagline, whatsapp, theme)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(slug) DO UPDATE SET
-            name=excluded.name,
-            tagline=excluded.tagline,
-            whatsapp=excluded.whatsapp,
-            theme=excluded.theme
-    """, (slug, name, request.form["tagline"], request.form["whatsapp"], request.form["theme"]))
-    conn.commit()
-    conn.close()
-    return redirect(url_for("home", slug=slug))
-
-@app.route("/upload_chunk", methods=["POST"])
-def upload_chunk():
-    chunk = request.files["chunk"]
-    filename = secure_filename(request.form["filename"])
-    chunk_index = int(request.form["chunkIndex"])
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-
-    mode = "wb" if chunk_index == 0 else "ab"
-    with open(filepath, mode) as f:
-        f.write(chunk.read())
-    return jsonify({"status": "ok"})
-
-@app.route("/save_ar_item/<slug>", methods=["POST"])
-def save_ar_item(slug):
-    data = request.get_json()
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO ar_items (studio_slug, title, photo_url, video_url, mind_url) VALUES (?, ?, ?, ?, ?)",
-        (slug, data["title"], data["photo_url"], data["video_url"], data["mind_url"])
-    )
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "saved"})
-
-@app.route("/studio/<slug>")
-def studio_portfolio(slug):
-    conn = get_db()
-    studio = conn.execute("SELECT * FROM studios WHERE slug = ?", (slug,)).fetchone()
-    if not studio:
-        conn.close()
-        return "Studio not found!", 404
-    items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ?", (slug,)).fetchall()
-    conn.close()
-    return render_template_string(PORTFOLIO_UI, studio=studio, items=items)
-
-@app.route("/ar_scan/<slug>")
-def ar_scan(slug):
-    conn = get_db()
-    studio = conn.execute("SELECT * FROM studios WHERE slug = ?", (slug,)).fetchone()
-    if not studio:
-        conn.close()
-        return "Studio not found!", 404
-    all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? ORDER BY id DESC", (slug,)).fetchall()
-    item_id = request.args.get("id", type=int)
-    active_item = None
-    if all_items:
-        active_item = next((it for it in all_items if it["id"] == item_id), all_items[0])
-    conn.close()
-    return render_template_string(REAL_AR_SCANNER_UI, studio=studio, all_items=all_items, active_item=active_item)
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-    
+                await compiler.compileImageTargets([i
