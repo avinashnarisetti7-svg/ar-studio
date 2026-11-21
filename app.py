@@ -113,9 +113,7 @@ LOGIN_UI = """
             font-weight: 800; font-size: 14px; cursor: pointer;
         }
     </style>
-</head>
-<body>
-    <div class="card">
+</head>    <div class="card">
         <span class="badge">AR CUT PRO</span>
         <h1>Creator Cloud Studio</h1>
         <p>Sign in with your Gmail to save your AR albums, personal studio link & 5 GB cloud storage.</p>
@@ -127,22 +125,35 @@ LOGIN_UI = """
         </div>
 
         {% if firebase_api_key %}
-        <button type="button" class="google-btn" onclick="googleSignIn()">
+        <button type="button" class="google-btn" onclick="startGoogleLogin()">
             <span style="color:#4285F4; font-weight:900;">G</span> Continue with Google (Gmail)
         </button>
-        {% else %}
-        <form method="POST" action="/auth_gmail">
+        <p id="authStatus" style="color:#00f2fe; font-size:12px; margin:10px 0 0;"></p>
+        {% endif %}
+
+        <form id="fallbackForm" method="POST" action="/auth_gmail" style="display:{{ 'none' if firebase_api_key else 'block' }}; margin-top:12px;">
             <input type="email" name="email" placeholder="Enter your Gmail (name@gmail.com)" required>
             <input type="text" name="name" placeholder="Studio / Creator Name" required>
             <button type="submit" class="sub-btn">Continue with Gmail</button>
         </form>
-        {% endif %}
     </div>
 
-        {% if firebase_api_key %}
+    {% if firebase_api_key %}
+    <script>
+        function startGoogleLogin() {
+            const st = document.getElementById("authStatus");
+            st.innerText = "Connecting to Google...";
+            if (window._firebaseGoogleLogin) {
+                window._firebaseGoogleLogin();
+            } else {
+                st.innerText = "Google popup blocked on this browser — enter Gmail below:";
+                document.getElementById("fallbackForm").style.display = "block";
+            }
+        }
+    </script>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-        import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
         const app = initializeApp({
             apiKey: "{{ firebase_api_key }}",
@@ -151,28 +162,26 @@ LOGIN_UI = """
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        function loginToBackend(u) {
-            const form = document.createElement("form");
-            form.method = "POST";
-            form.action = "/auth_gmail";
-            form.innerHTML = `<input name="email" value="${u.email}"><input name="name" value="${u.displayName || u.email.split('@')[0]}">`;
-            document.body.appendChild(form);
-            form.submit();
-        }
-
-        getRedirectResult(auth)
-            .then((res) => {
-                if (res && res.user) loginToBackend(res.user);
-            })
-            .catch((e) => {
-                alert("Google Sign-In Error: " + e.message);
-            });
-
-        window.googleSignIn = () => {
-            signInWithRedirect(auth, provider);
+        window._firebaseGoogleLogin = async () => {
+            const st = document.getElementById("authStatus");
+            try {
+                const res = await signInWithPopup(auth, provider);
+                const u = res.user;
+                st.innerText = "Welcome " + u.email + "! Loading Studio...";
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/auth_gmail";
+                form.innerHTML = `<input name="email" value="${u.email}"><input name="name" value="${u.displayName || u.email.split('@')[0]}">`;
+                document.body.appendChild(form);
+                form.submit();
+            } catch (e) {
+                st.innerText = "Error: " + (e.code || e.message) + " — or sign in below:";
+                document.getElementById("fallbackForm").style.display = "block";
+            }
         };
     </script>
     {% endif %}
+
 
 </body>
 </html>
