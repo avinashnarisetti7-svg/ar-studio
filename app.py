@@ -139,10 +139,10 @@ LOGIN_UI = """
         {% endif %}
     </div>
 
-    {% if firebase_api_key %}
+        {% if firebase_api_key %}
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+        import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
         const app = initializeApp({
             apiKey: "{{ firebase_api_key }}",
@@ -151,22 +151,29 @@ LOGIN_UI = """
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        window.googleSignIn = async () => {
-            try {
-                const res = await signInWithPopup(auth, provider);
-                const u = res.user;
-                const form = document.createElement("form");
-                form.method = "POST";
-                form.action = "/auth_gmail";
-                form.innerHTML = `<input name="email" value="${u.email}"><input name="name" value="${u.displayName || u.email.split('@')[0]}">`;
-                document.body.appendChild(form);
-                form.submit();
-            } catch (e) {
+        function loginToBackend(u) {
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/auth_gmail";
+            form.innerHTML = `<input name="email" value="${u.email}"><input name="name" value="${u.displayName || u.email.split('@')[0]}">`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        getRedirectResult(auth)
+            .then((res) => {
+                if (res && res.user) loginToBackend(res.user);
+            })
+            .catch((e) => {
                 alert("Google Sign-In Error: " + e.message);
-            }
+            });
+
+        window.googleSignIn = () => {
+            signInWithRedirect(auth, provider);
         };
     </script>
     {% endif %}
+
 </body>
 </html>
 """
