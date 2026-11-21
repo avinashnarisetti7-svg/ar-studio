@@ -875,11 +875,23 @@ def save_ar_item():
     data = request.get_json()
     size_bytes = int(data.get("size_bytes", 0))
 
-    conn = get_db()
+        conn = get_db()
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
+        conn.commit()
+    except Exception:
+        pass
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    gen_count = conn.execute("SELECT COUNT(*) AS cnt FROM ar_items WHERE owner_email = ?", (email,)).fetchone()["cnt"]
+    max_gens = user["max_generates"] if "max_generates" in user.keys() and user["max_generates"] is not None else 5
+
+    if gen_count >= max_gens:
+        conn.close()
+        return jsonify({"error": f"Free limit of {max_gens} AR Generates reached! Contact Admin to upgrade."}), 403
+
     if user["used_bytes"] + size_bytes > user["quota_bytes"]:
         conn.close()
-        return jsonify({"error": "5 GB Free Storage Limit Reached!"}), 403
+        return jsonify({"error": "Storage Limit Reached! Contact Admin to upgrade."}), 403
 
     conn.execute(
         "INSERT INTO ar_items (owner_email, studio_slug, title, photo_url, video_url, mind_url, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -928,9 +940,76 @@ def ar_scan(slug):
     conn.close()
     return render_template_string(REAL_AR_SCANNER_UI, studio=studio, all_items=all_items, active_item=active_item)
 
+ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_panel():
+    email = session.get("user_email", "")
+    if email.lower() != ADMIN_EMAIL.lower():
+        return "Access Denied: Owner Only", 403
+    conn = get_db()
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
+        conn.commit()
+    except Exception:
+        pass
+    if request.method == "POST":
+        target_email = request.form.get("target_email")
+        new_gb = float(request.form.get("quota_gb", 5))
+        new_gens = int(request.form.get("max_generates", 5))
+        conn.execute("UPDATE users SET quota_bytes = ?, max_generates = ? WHERE email = ?", (int(new_gb * 1024 * 1024 * 1024), new_gens, target_email))
+        conn.commit()
+        conn.close()
+        return redirect(url_for("admin_panel"))
+    users = conn.execute("""
+        SELECT u.*, COUNT(a.id) AS gen_count
+        FROM users u LEFT JOIN ar_items a ON u.email = a.owner_email
+        GROUP BY u.email ORDER BY u.used_bytes DESC
+    """).fetchall()
+    conn.close()
+    rows = ""
+    for u in users:
+        used_mb = round((u["used_bytes"] or 0) / (1024 * 1024), 1)
+        quota_gb = round((u["quota_bytes"] or 5368709120) / (1024 * 1024 * 1024), 1)
+        max_g = u["max_generates"] if "max_generates" in u.keys() and u["max_generates"] is not None else 5
+        rows += f"""
+        <div style="background:#141417;border:1px solid #2a2a32;border-radius:16px;padding:16px;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:15px;color:#00f2fe;">{u['studio_name'] or 'No Studio Name'}</div>
+            <div style="font-size:12px;color:#a1a1aa;margin:3px 0;">{u['display_name'] or ''} ({u['email']})</div>
+            <div style="font-size:12px;color:#fff;margin:6px 0;">WhatsApp: {u['whatsapp'] or 'N/A'} | Used: <b>{used_mb} MB / {quota_gb} GB</b> | Generates: <b>{u['gen_count']} / {max_g}</b></div>
+            <form method="POST" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+                <input type="hidden" name="target_email" value="{u['email']}">
+                <label style="font-size:12px;">GB: <input type="number" step="0.5" name="quota_gb" value="{quota_gb}" style="width:65px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
+                <label style="font-size:12px;">Gens: <input type="number" name="max_generates" value="{max_g}" style="width:65px;padding:6px;border-radius:8px;border:1px solid #333;background:#09090b;color:#fff;"></label>
+                <button type="submit" style="background:linear-gradient(135deg,#00f2fe,#4facfe);color:#000;border:none;padding:7px 14px;border-radius:8px;font-weight:800;cursor:pointer;">Update</button>
+            </form>
+        </div>"""
+    return f"""<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>AR Cut PRO - Owner Admin</title></head>
+    <body style="background:#09090b;color:#fff;font-family:-apple-system,sans-serif;padding:18px;max-width:600px;margin:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;">AR Cut PRO <span style="background:#00f2fe;color:#000;font-size:11px;padding:3px 8px;border-radius:6px;">ADMIN</span></h2>
+            <a href="/" style="color:#00f2fe;font-size:13px;text-decoration:none;">← Dashboard</a>
+        </div>
+        <div style="margin-bottom:14px;font-size:13px;color:#a1a1aa;">Total Registered Users: <b style="color:#fff;">{len(users)}</b></div>
+        {rows}
+    </body></html>"""
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    return jsonify({
+        "name": "AR Cut PRO - Creator Cloud Studio",
+        "short_name": "AR Cut PRO",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#09090b",
+        "theme_color": "#00f2fe",
+        "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/3159/3159310.png", "sizes": "512x512", "type": "image/png"}]
+    })
+
+@app.route("/sw.js")
+def pwa_sw():
+    return "self.addEventListener('fetch', function(e) {});", 200, {"Content-Type": "application/javascript"}
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-    
-    
-    
