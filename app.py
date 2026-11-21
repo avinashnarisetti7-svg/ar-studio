@@ -609,7 +609,10 @@ PORTFOLIO_UI = """
     <div class="hero">
         <h1>{{ studio.studio_name }}</h1>
         <p style="opacity:0.8;">{{ studio.tagline }}</p>
-        <a class="btn wa-btn" href="https://wa.me/{{ studio.whatsapp }}?text=Hi {{ studio.studio_name }}, I saw your AR Portfolio!" target="_blank">Book on WhatsApp</a>
+        {% if studio.whatsapp %}
+<a class="btn wa-btn" href="https://wa.me/{{ studio.whatsapp }}?text=Hi {{ studio.studio_name }}, I saw your AR Portfolio!" target="_blank">Book / WhatsApp Studio</a>
+{% endif %}
+
         <a class="btn cam-btn" href="/ar_scan/{{ studio.studio_slug }}">Open Live AR Scanner</a>
     </div>
 
@@ -759,7 +762,7 @@ def auth_gmail():
             counter += 1
         conn.execute(
             "INSERT INTO users (email, display_name, studio_slug, studio_name, tagline, whatsapp, theme, quota_bytes, used_bytes) VALUES (?, ?, ?, ?, ?, ?, 'dark', ?, 0)",
-            (email, name, slug, name + " Studio", "Capturing Timeless Memories in AR", "919876543210", FREE_QUOTA_BYTES)
+            (email, name, slug, name + " Studio", "Capturing Timeless Memories in AR", "", FREE_QUOTA_BYTES)
         )
         conn.commit()
     conn.close()
