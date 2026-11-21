@@ -793,11 +793,7 @@ def home():
             firebase_auth_domain=FIREBASE_AUTH_DOMAIN
         )
     conn = get_db()
-    try:
-        conn.execute("ALTER TABLE users ADD COLUMN is_co_owner INTEGER DEFAULT 0")
-        conn.commit()
-    except Exception:
-        conn.rollback()
+    
     user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     if not user:
         session.clear()
