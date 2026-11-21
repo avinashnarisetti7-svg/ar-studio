@@ -874,8 +874,7 @@ def save_ar_item():
         return jsonify({"error": "Login required"}), 401
     data = request.get_json()
     size_bytes = int(data.get("size_bytes", 0))
-
-        conn = get_db()
+    conn = get_db()
     try:
         conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
         conn.commit()
