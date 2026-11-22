@@ -746,7 +746,7 @@ REAL_AR_SCANNER_UI = """
         device-orientation-permission-ui="enabled: false">
         
         <a-assets>
-            <video id="arVid" src="{{ active_item.video_url }}" preload="auto" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
+                    <video id="arVid" src="{{ active_item.video_url }}" preload="metadata" loop crossorigin="anonymous" playsinline></video>
         </a-assets>
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -913,8 +913,12 @@ def save_ar_item():
     size_bytes = int(data.get("size_bytes", 0))
     conn = get_db()
     try:
-        conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
-        conn.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
+        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_generates INTEGER DEFAULT 5")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE ar_items ADD COLUMN IF NOT EXISTS client_name TEXT DEFAULT 'General Album'")
         conn.commit()
     except Exception:
         pass
