@@ -912,15 +912,15 @@ def save_ar_item():
             return jsonify({"error": "Login required"}), 401
         data = request.get_json()
         size_bytes = int(data.get("size_bytes", 0))
-        conn = get_db()
         try:
-            conn.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
-            conn.commit()
+        c2 = get_db()
+        c2.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
+        c2.commit()
+        c2.close()
         except Exception:
-            try:
-                conn.rollback()
-            except Exception:
-                pass
+            pass
+        conn = get_db()
+
         user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         gen_count = conn.execute("SELECT COUNT(*) AS cnt FROM ar_items WHERE owner_email = ?", (email,)).fetchone()["cnt"]
         max_gens = user["max_generates"] if "max_generates" in user.keys() and user["max_generates"] is not None else 5
