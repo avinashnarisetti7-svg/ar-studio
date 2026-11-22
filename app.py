@@ -11,9 +11,16 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "arcut-pro-secret-2026")
+from flask import send_file
+from PIL import Image
+
+@app.route("/logo.png")
+def brand_logo():
+    return send_file("logo.png", mimetype="image/png")
+
 @app.route("/icon-<int:size>.png")
 def pwa_icon(size):
-    img = qrcode.make("AR Cut PRO").resize((size, size))
+    img = Image.open("logo.png").convert("RGBA").resize((size, size))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(buf.getvalue(), mimetype="image/png")
@@ -21,17 +28,18 @@ def pwa_icon(size):
 @app.route("/manifest.json")
 def pwa_manifest():
     return jsonify({
-        "name": "AR Cut PRO Studio",
-        "short_name": "AR Cut PRO",
+        "name": "Avinash_clicks AR Studio",
+        "short_name": "Avinash_clicks",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#09090b",
+        "background_color": "#000000",
         "theme_color": "#00f2fe",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
             {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
         ]
     })
+
 
 @app.route("/sw.js")
 def pwa_sw():
@@ -240,7 +248,7 @@ CAPCUT_BUILDER_UI = """
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>AR Cut Studio - {{ user.studio_name }}</title>
+        <title>Avinash_clicks - {{ user.studio_name }}</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#00f2fe">
     <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }</script>
@@ -318,7 +326,7 @@ CAPCUT_BUILDER_UI = """
 </head>
 <body>
 <div class="topbar">
-  <div class="brand">AR Cut <span class="brand-badge">PRO</span></div>
+    <div class="brand"><img src="/logo.png" style="height:28px;width:28px;border-radius:6px;object-fit:cover;"> Avinash_clicks <span class="brand-badge">AR</span></div>
   <div style="display:flex;gap:8px;align-items:center;">
     {% if is_admin %}
       <a href="/admin" class="export-btn" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#000;">Owner Panel</a>
