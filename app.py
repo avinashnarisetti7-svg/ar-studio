@@ -913,10 +913,10 @@ def save_ar_item():
         data = request.get_json()
         size_bytes = int(data.get("size_bytes", 0))
         try:
-        c2 = get_db()
-        c2.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
-        c2.commit()
-        c2.close()
+            c2 = get_db()
+            c2.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
+            c2.commit()
+            c2.close()
         except Exception:
             pass
         conn = get_db()
