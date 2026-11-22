@@ -950,7 +950,7 @@ def delete_ar(item_id):
     item = conn.execute("SELECT * FROM ar_items WHERE id = ? AND owner_email = ?", (item_id, email)).fetchone()
     if item:
         conn.execute("DELETE FROM ar_items WHERE id = ?", (item_id,))
-                sz = item["size_bytes"] or 0
+        sz = item["size_bytes"] or 0
         conn.execute("UPDATE users SET used_bytes = CASE WHEN used_bytes - ? < 0 THEN 0 ELSE used_bytes - ? END WHERE email = ?", (sz, sz, email))
         conn.commit()
     conn.close()
