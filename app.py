@@ -360,7 +360,8 @@ CAPCUT_BUILDER_UI = """
                     <div class="canvas-placeholder">Select Photo & Video tracks below to preview</div>
                 </div>
 
-                <input type="text" id="arTitle" placeholder="Project Name (Ex: Wedding Reception AR)">
+                       <input type="text" id="arClient" placeholder="Client / Couple Name (Ex: Ravi & Priya)">
+        <input type="text" id="arTitle" placeholder="Photo Title (Ex: Reception Entry)">
 
                 <div class="track-row">
                     <div class="track-info">
@@ -909,6 +910,7 @@ def save_ar_item():
     conn = get_db()
     try:
         conn.execute("ALTER TABLE users ADD COLUMN max_generates INTEGER DEFAULT 5")
+                conn.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
         conn.commit()
     except Exception:
         pass
@@ -924,10 +926,12 @@ def save_ar_item():
         conn.close()
         return jsonify({"error": "Storage Limit Reached! Contact Admin to upgrade."}), 403
 
+        client_name = (data.get("client_name") or "General Album").strip()
     conn.execute(
-        "INSERT INTO ar_items (owner_email, studio_slug, title, photo_url, video_url, mind_url, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (email, user["studio_slug"], data["title"], data["photo_url"], data["video_url"], data["mind_url"], size_bytes)
+        "INSERT INTO ar_items (owner_email, studio_slug, client_name, title, photo_url, video_url, mind_url, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (email, user["studio_slug"], client_name, data["title"], data["photo_url"], data["video_url"], data["mind_url"], size_bytes)
     )
+
     conn.execute("UPDATE users SET used_bytes = used_bytes + ? WHERE email = ?", (size_bytes, email))
     conn.commit()
     conn.close()
@@ -942,7 +946,8 @@ def delete_ar(item_id):
     item = conn.execute("SELECT * FROM ar_items WHERE id = ? AND owner_email = ?", (item_id, email)).fetchone()
     if item:
         conn.execute("DELETE FROM ar_items WHERE id = ?", (item_id,))
-        conn.execute("UPDATE users SET used_bytes = MAX(0, used_bytes - ?) WHERE email = ?", (item["size_bytes"], email))
+                sz = item["size_bytes"] or 0
+        conn.execute("UPDATE users SET used_bytes = CASE WHEN used_bytes - ? < 0 THEN 0 ELSE used_bytes - ? END WHERE email = ?", (sz, sz, email))
         conn.commit()
     conn.close()
     return redirect(url_for("home"))
@@ -958,18 +963,29 @@ def studio_portfolio(slug):
     conn.close()
     return render_template_string(PORTFOLIO_UI, studio=studio, items=items)
 
+@app.route("/scan")
 @app.route("/ar_scan/<slug>")
-def ar_scan(slug):
+def ar_scan(slug=None):
     conn = get_db()
-    studio = conn.execute("SELECT * FROM users WHERE studio_slug = ?", (slug,)).fetchone()
-    if not studio:
-        conn.close()
-        return "Studio not found!", 404
-    all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? ORDER BY id DESC", (slug,)).fetchall()
+    slug = slug or request.args.get("studio")
+    client = request.args.get("client")
+    if slug:
+        studio = conn.execute("SELECT * FROM users WHERE studio_slug = ?", (slug,)).fetchone()
+        if not studio:
+            conn.close()
+            return "Studio not found!", 404
+        if client:
+            all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? AND client_name = ? ORDER BY id DESC", (slug, client)).fetchall()
+        else:
+            all_items = conn.execute("SELECT * FROM ar_items WHERE studio_slug = ? ORDER BY id DESC", (slug,)).fetchall()
+    else:
+        studio = {"studio_name": "Avinash_clicks Universal AR", "studio_slug": "all"}
+        all_items = conn.execute("SELECT * FROM ar_items ORDER BY id DESC").fetchall()
     item_id = request.args.get("id", type=int)
     active_item = next((it for it in all_items if it["id"] == item_id), all_items[0]) if all_items else None
     conn.close()
     return render_template_string(REAL_AR_SCANNER_UI, studio=studio, all_items=all_items, active_item=active_item)
+
 
 ADMIN_EMAIL = "avinashnarisetti7@gmail.com"
 @app.route("/admin", methods=["GET", "POST"])
