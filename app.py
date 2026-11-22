@@ -406,10 +406,12 @@ CAPCUT_BUILDER_UI = """
                 <div class="project-card">
                     <img src="{{ item.photo_url }}">
                     <div class="project-meta">
-                        <h4>{{ item.title }}</h4>
-                        <div style="font-size:10px; color:var(--muted); margin-bottom:6px;">Size: {{ (item.size_bytes / (1024*1024))|round(1) }} MB</div>
-                        <div class="project-actions">
-                            <a href="/ar_scan/{{ user.studio_slug }}?id={{ item.id }}" class="mini-btn btn-scan">Test AR</a>
+                                <div style="font-size:10px; color:#00f2fe; font-weight:700; margin-bottom:2px;">📁 {{ item.client_name or 'General Album' }}</div>
+        <h4>{{ item.title }}</h4>
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">Size: {{ (item.size_bytes / 1048576)|round(1) }} MB</div>
+        <div class="project-actions">
+          <a href="/scan?studio={{ user.studio_slug }}&client={{ (item.client_name or 'General Album')|urlencode }}" class="mini-btn btn-scan">Scan</a>
+          <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={{ (request.host_url ~ 'scan?studio=' ~ user.studio_slug ~ '&client=' ~ (item.client_name or 'General Album'))|urlencode }}" target="_blank" class="mini-btn" style="background:#f59e0b22; color:#fbbf24;">Client QR</a>
                             <form method="POST" action="/delete_ar/{{ item.id }}" style="flex:1; margin:0;">
                                 <button type="submit" class="mini-btn btn-del" style="width:100%;">Delete</button>
                             </form>
@@ -568,6 +570,8 @@ CAPCUT_BUILDER_UI = """
         <script>
         async function startFastARUpload() {
             const title = document.getElementById("arTitle").value.trim();
+                  const clientName = (document.getElementById("arClient")?.value || "General Album").trim() || "General Album";
+                  
             const photoFile = document.getElementById("arPhoto").files[0];
             const videoFile = document.getElementById("arVideo").files[0];
 
@@ -631,10 +635,10 @@ CAPCUT_BUILDER_UI = """
                 const saveRes = await fetch("/save_ar_item", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        title, photo_url: photoUrl, video_url: videoUrl,
-                        mind_url: mindUrl, size_bytes: totalSavedBytes
-                    })
+                            body: JSON.stringify({
+          client_name: clientName, title, photo_url: photoUrl, video_url: videoUrl,
+          mind_url: mindUrl, size_bytes: totalSavedBytes
+        })
                 });
                 const saveData = await saveRes.json();
                 if (!saveRes.ok) throw new Error(saveData.error || "Save failed");
