@@ -906,45 +906,44 @@ def upload_chunk():
 
 @app.route("/save_ar_item", methods=["POST"])
 def save_ar_item():
-    email = session.get("user_email")
-    if not email:
-        return jsonify({"error": "Login required"}), 401
-    data = request.get_json()
-    size_bytes = int(data.get("size_bytes", 0))
-    conn = get_db()
     try:
-        conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS max_generates INTEGER DEFAULT 5")
-        conn.commit()
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE ar_items ADD COLUMN IF NOT EXISTS client_name TEXT DEFAULT 'General Album'")
-        conn.commit()
-    except Exception:
-        pass
-    user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-    gen_count = conn.execute("SELECT COUNT(*) AS cnt FROM ar_items WHERE owner_email = ?", (email,)).fetchone()["cnt"]
-    max_gens = user["max_generates"] if "max_generates" in user.keys() and user["max_generates"] is not None else 5
+        email = session.get("user_email")
+        if not email:
+            return jsonify({"error": "Login required"}), 401
+        data = request.get_json()
+        size_bytes = int(data.get("size_bytes", 0))
+        conn = get_db()
+        try:
+            conn.execute("ALTER TABLE ar_items ADD COLUMN client_name TEXT DEFAULT 'General Album'")
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        gen_count = conn.execute("SELECT COUNT(*) AS cnt FROM ar_items WHERE owner_email = ?", (email,)).fetchone()["cnt"]
+        max_gens = user["max_generates"] if "max_generates" in user.keys() and user["max_generates"] is not None else 5
 
-    if gen_count >= max_gens:
-        conn.close()
-        return jsonify({"error": f"Free limit of {max_gens} AR Generates reached! Contact Admin to upgrade."}), 403
+        if gen_count >= max_gens:
+            conn.close()
+            return jsonify({"error": f"Free limit of {max_gens} AR Generates reached! Contact Admin to upgrade."}), 403
 
-    if user["used_bytes"] + size_bytes > user["quota_bytes"]:
-        conn.close()
-        return jsonify({"error": "Storage Limit Reached! Contact Admin to upgrade."}), 403
+        if user["used_bytes"] + size_bytes > user["quota_bytes"]:
+            conn.close()
+            return jsonify({"error": "Storage Limit Reached! Contact Admin to upgrade."}), 403
 
         client_name = (data.get("client_name") or "General Album").strip()
-    conn.execute(
-        "INSERT INTO ar_items (owner_email, studio_slug, client_name, title, photo_url, video_url, mind_url, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (email, user["studio_slug"], client_name, data["title"], data["photo_url"], data["video_url"], data["mind_url"], size_bytes)
-    )
-
-    conn.execute("UPDATE users SET used_bytes = used_bytes + ? WHERE email = ?", (size_bytes, email))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "saved"})
-
+        conn.execute(
+            "INSERT INTO ar_items (owner_email, studio_slug, client_name, title, photo_url, video_url, mind_url, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (email, user["studio_slug"], client_name, data["title"], data["photo_url"], data["video_url"], data["mind_url"], size_bytes)
+        )
+        conn.execute("UPDATE users SET used_bytes = used_bytes + ? WHERE email = ?", (size_bytes, email))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "saved"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 @app.route("/delete_ar/<int:item_id>", methods=["POST"])
 def delete_ar(item_id):
     email = session.get("user_email")
